@@ -100,7 +100,7 @@ export const generateVerticalStackedBars = ({
                     barHeight -= innerPadding
                 }
 
-                if (barHeight > 0) {
+                if (barHeight > 0 || d[1] - d[0] > 0) {
                     const barData = {
                         id: stackedDataItem.key,
                         value: d.data[stackedDataItem.key],
@@ -115,7 +115,7 @@ export const generateVerticalStackedBars = ({
                         x,
                         y,
                         width: barWidth,
-                        height: barHeight,
+                        height: barHeight > 0 ? barHeight : 1,
                         color: getColor(barData),
                     })
                 }
