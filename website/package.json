@@ -1,10 +1,10 @@
 {
   "name": "nivo-website",
-  "version": "0.59.3",
+  "version": "0.59.4",
   "private": true,
   "description": "nivo website",
   "dependencies": {
-    "@nivo/bar": "0.59.2",
+    "@nivo/bar": "0.59.4",
     "@nivo/bullet": "0.59.2",
     "@nivo/bump": "0.59.1",
     "@nivo/calendar": "0.59.1",
@@ -16,7 +16,7 @@
     "@nivo/geo": "0.59.2",
     "@nivo/heatmap": "0.59.2",
     "@nivo/legends": "0.59.1",
-    "@nivo/line": "0.59.3",
+    "@nivo/line": "0.59.4",
     "@nivo/network": "0.59.1",
     "@nivo/parallel-coordinates": "0.59.2",
     "@nivo/pie": "0.59.1",
