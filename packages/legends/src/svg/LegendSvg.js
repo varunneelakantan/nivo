@@ -23,6 +23,8 @@ const LegendSvg = ({
 
     x,
     y,
+    containerHeight,
+    scrollableLegend,
     direction,
     padding: _padding,
     justify,
@@ -63,33 +65,68 @@ const LegendSvg = ({
     } else if (direction === 'column') {
         yStep = itemHeight + itemsSpacing
     }
-
     return (
         <g transform={`translate(${x},${y})`}>
-            {data.map((data, i) => (
-                <LegendSvgItem
-                    key={i}
-                    data={data}
-                    x={i * xStep + padding.left}
-                    y={i * yStep + padding.top}
-                    width={itemWidth}
-                    height={itemHeight}
-                    direction={itemDirection}
-                    justify={justify}
-                    effects={effects}
-                    textColor={itemTextColor}
-                    background={itemBackground}
-                    opacity={itemOpacity}
-                    symbolShape={symbolShape}
-                    symbolSize={symbolSize}
-                    symbolSpacing={symbolSpacing}
-                    symbolBorderWidth={symbolBorderWidth}
-                    symbolBorderColor={symbolBorderColor}
-                    onClick={onClick}
-                    onMouseEnter={onMouseEnter}
-                    onMouseLeave={onMouseLeave}
-                />
-            ))}
+            {scrollableLegend ?
+                <foreignObject width={180} height={containerHeight}>
+                    <div style={{
+                        height: '100%',
+                        overflow: 'auto'
+                    }} xmlns="http://www.w3.org/1999/xhtml">
+                        <svg xmlns="http://www.w3.org/2000/svg" role="img" width={'100%'} height={`${data.length * itemHeight}px`}>
+                            {data.map((data, i) => (
+                                <LegendSvgItem
+                                    key={i}
+                                    data={data}
+                                    x={i * xStep + padding.left}
+                                    y={i * yStep + padding.top}
+                                    width={itemWidth}
+                                    height={itemHeight}
+                                    direction={itemDirection}
+                                    justify={justify}
+                                    effects={effects}
+                                    textColor={itemTextColor}
+                                    background={itemBackground}
+                                    opacity={itemOpacity}
+                                    symbolShape={symbolShape}
+                                    symbolSize={symbolSize}
+                                    symbolSpacing={symbolSpacing}
+                                    symbolBorderWidth={symbolBorderWidth}
+                                    symbolBorderColor={symbolBorderColor}
+                                    onClick={onClick}
+                                    onMouseEnter={onMouseEnter}
+                                    onMouseLeave={onMouseLeave}
+                                />
+                            ))}
+                        </svg>
+                    </div>
+                </foreignObject> :
+                <>
+                    {data.map((data, i) => (
+                        <LegendSvgItem
+                            key={i}
+                            data={data}
+                            x={i * xStep + padding.left}
+                            y={i * yStep + padding.top}
+                            width={itemWidth}
+                            height={itemHeight}
+                            direction={itemDirection}
+                            justify={justify}
+                            effects={effects}
+                            textColor={itemTextColor}
+                            background={itemBackground}
+                            opacity={itemOpacity}
+                            symbolShape={symbolShape}
+                            symbolSize={symbolSize}
+                            symbolSpacing={symbolSpacing}
+                            symbolBorderWidth={symbolBorderWidth}
+                            symbolBorderColor={symbolBorderColor}
+                            onClick={onClick}
+                            onMouseEnter={onMouseEnter}
+                            onMouseLeave={onMouseLeave}
+                        />
+                    ))}
+                </>}
         </g>
     )
 }
@@ -99,6 +136,8 @@ LegendSvg.propTypes = {
 
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired,
+    containerHeight: PropTypes.number,
+    scrollableLegend: PropTypes.bool,
     direction: PropTypes.oneOf(['row', 'column']).isRequired,
     padding: PropTypes.oneOfType([
         PropTypes.number,

@@ -30,6 +30,7 @@ const BarAnnotations = ({ bars, annotations, animate, motionStiffness, motionDam
     })
 
     return boundAnnotations.map((annotation, i) => (
+        /* eslint no-restricted-globals:0 */
         <Annotation
             key={i}
             {...annotation}
@@ -39,6 +40,7 @@ const BarAnnotations = ({ bars, annotations, animate, motionStiffness, motionDam
             motionStiffness={motionStiffness}
             motionDamping={motionDamping}
         />
+        /* eslint no-restricted-globals:0 */
     ))
 }
 

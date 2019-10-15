@@ -10,7 +10,7 @@ import React, { Fragment, useState, useMemo } from 'react'
 import { withContainer, useDimensions, useTheme, SvgWrapper, CartesianMarkers } from '@nivo/core'
 import { useInheritedColor } from '@nivo/colors'
 import { Axes, Grid } from '@nivo/axes'
-import { BoxLegendSvg } from '@nivo/legends'
+import { BoxLegendSvg } from '../../legends/src'
 import { Crosshair } from '@nivo/tooltip'
 import { useLine } from './hooks'
 import { LinePropTypes, LineDefaultProps } from './props'
@@ -65,7 +65,7 @@ const Line = props => {
         markers,
 
         legends,
-
+        scrollableLegend,
         isInteractive,
 
         useMesh,
@@ -180,6 +180,7 @@ const Line = props => {
                 containerWidth={innerWidth}
                 containerHeight={innerHeight}
                 data={legend.data || legendData}
+                scrollableLegend={scrollableLegend}
                 theme={theme}
             />
         )),

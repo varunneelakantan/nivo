@@ -84,6 +84,7 @@ export const BarPropTypes = {
             ...LegendPropShape,
         })
     ).isRequired,
+    scrollableLegend: PropTypes.bool,
 
     pixelRatio: PropTypes.number.isRequired,
 }
@@ -130,6 +131,7 @@ export const BarDefaultProps = {
     onMouseLeave: noop,
 
     legends: [],
+    scrollableLegend: false,
 
     annotations: [],
 

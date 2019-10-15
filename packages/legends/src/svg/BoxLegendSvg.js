@@ -34,6 +34,7 @@ const BoxLegendSvg = ({
 
     containerWidth,
     containerHeight,
+    scrollableLegend,
     translateX,
     translateY,
     anchor,
@@ -85,6 +86,8 @@ const BoxLegendSvg = ({
             data={data}
             x={x}
             y={y}
+            containerHeight={containerHeight}
+            scrollableLegend={scrollableLegend}
             direction={direction}
             padding={padding}
             justify={justify}
@@ -112,6 +115,7 @@ BoxLegendSvg.propTypes = {
     data: PropTypes.arrayOf(datumPropType).isRequired,
     containerWidth: PropTypes.number.isRequired,
     containerHeight: PropTypes.number.isRequired,
+    scrollableLegend: PropTypes.bool,
     translateX: PropTypes.number.isRequired,
     translateY: PropTypes.number.isRequired,
     anchor: PropTypes.oneOf([
