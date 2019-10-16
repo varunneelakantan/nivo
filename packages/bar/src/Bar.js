@@ -10,7 +10,7 @@ import React, { Fragment } from 'react'
 import { TransitionMotion, spring } from 'react-motion'
 import { bindDefs, Container, SvgWrapper, CartesianMarkers } from '@nivo/core'
 import { Axes, Grid } from '@nivo/axes'
-import { BoxLegendSvg } from '@nivo/legends'
+import { BoxLegendSvg } from '../../legends/src'
 import { generateGroupedBars, generateStackedBars, getLegendData } from './compute'
 import setDisplayName from 'recompose/setDisplayName'
 import enhance from './enhance'
@@ -104,6 +104,7 @@ const Bar = props => {
         onMouseLeave,
 
         legends,
+        scrollableLegend,
 
         animate,
         motionStiffness,
@@ -290,6 +291,7 @@ const Bar = props => {
                                 {...legend}
                                 containerWidth={width}
                                 containerHeight={height}
+                                scrollableLegend={scrollableLegend}
                                 data={legendData}
                                 theme={theme}
                             />

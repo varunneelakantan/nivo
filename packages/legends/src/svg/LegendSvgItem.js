@@ -82,7 +82,9 @@ const LegendSvgItem = ({
         }
 
         if (onMouseLeave === undefined) return
+        /* eslint no-restricted-globals:0 */
         onMouseLeave(data, event)
+        /* eslint no-restricted-globals:0 */
     }, [onMouseLeave, data, effects])
 
     const { symbolX, symbolY, labelX, labelY, labelAnchor, labelAlignment } = computeItemLayout({

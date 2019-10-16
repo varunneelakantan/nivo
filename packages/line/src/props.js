@@ -115,7 +115,7 @@ const commonPropTypes = {
     ).isRequired,
 
     legends: PropTypes.arrayOf(PropTypes.shape(LegendPropShape)).isRequired,
-
+    scrollableLegend: PropTypes.bool,
     isInteractive: PropTypes.bool.isRequired,
     debugMesh: PropTypes.bool.isRequired,
 
@@ -187,7 +187,7 @@ const commonDefaultProps = {
     defs: [],
 
     legends: [],
-
+    scrollableLegend: false,
     isInteractive: true,
     tooltip: PointTooltip,
     enableSlices: false,
