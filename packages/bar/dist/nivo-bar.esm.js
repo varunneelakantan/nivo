@@ -1,8 +1,11 @@
-import React, { Fragment, Component } from 'react';
+import React, { PureComponent, useState, useCallback, Fragment, Component } from 'react';
 import { TransitionMotion, spring } from 'react-motion';
-import { defsPropTypes, noop, withTheme, withDimensions, withMotion, getAccessorFor, getLabelGenerator, bindDefs, Container, CartesianMarkers, SvgWrapper, getRelativeCursor, isCursorInRect, ResponsiveWrapper } from '@nivo/core';
+import { useTheme, defsPropTypes, noop, withTheme, withDimensions, withMotion, getAccessorFor, getLabelGenerator, bindDefs, Container, CartesianMarkers, SvgWrapper, getRelativeCursor, isCursorInRect, ResponsiveWrapper } from '@nivo/core';
 import { axisPropType, Grid, Axes, renderGridLinesToCanvas, renderAxesToCanvas } from '@nivo/axes';
-import { LegendPropShape, BoxLegendSvg, renderLegendToCanvas } from '@nivo/legends';
+import PropTypes from 'prop-types';
+import isFunction from 'lodash/isFunction';
+import isNumber from 'lodash/isNumber';
+import isPlainObject from 'lodash/isPlainObject';
 import min from 'lodash/min';
 import max from 'lodash/max';
 import range from 'lodash/range';
@@ -16,9 +19,836 @@ import defaultProps from 'recompose/defaultProps';
 import withPropsOnChange from 'recompose/withPropsOnChange';
 import pure from 'recompose/pure';
 import { inheritedColorPropType, ordinalColorsPropType, colorPropertyAccessorPropType, getOrdinalColorScale, getInheritedColorGenerator } from '@nivo/colors';
-import PropTypes from 'prop-types';
+import { LegendPropShape as LegendPropShape$1, renderLegendToCanvas } from '@nivo/legends';
 import { BasicTooltip } from '@nivo/tooltip';
 import { useAnnotations, Annotation } from '@nivo/annotations';
+
+var DIRECTION_ROW = 'row';
+var DIRECTION_COLUMN = 'column';
+var ANCHOR_TOP = 'top';
+var ANCHOR_TOP_RIGHT = 'top-right';
+var ANCHOR_RIGHT = 'right';
+var ANCHOR_BOTTOM_RIGHT = 'bottom-right';
+var ANCHOR_BOTTOM = 'bottom';
+var ANCHOR_BOTTOM_LEFT = 'bottom-left';
+var ANCHOR_LEFT = 'left';
+var ANCHOR_TOP_LEFT = 'top-left';
+var ANCHOR_CENTER = 'center';
+var DIRECTION_LEFT_TO_RIGHT = 'left-to-right';
+var DIRECTION_RIGHT_TO_LEFT = 'right-to-left';
+var DIRECTION_TOP_TO_BOTTOM = 'top-to-bottom';
+var DIRECTION_BOTTOM_TO_TOP = 'bottom-to-top';
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty(target, key, source[key]); }); } return target; }
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var legendEffectPropType = PropTypes.shape({
+  on: PropTypes.oneOfType([PropTypes.oneOf(['hover'])]).isRequired,
+  style: PropTypes.shape({
+    itemTextColor: PropTypes.string,
+    itemBackground: PropTypes.string,
+    itemOpacity: PropTypes.number,
+    symbolSize: PropTypes.number,
+    symbolBorderWidth: PropTypes.number,
+    symbolBorderColor: PropTypes.string
+  }).isRequired
+});
+var symbolPropTypes = {
+  symbolShape: PropTypes.oneOfType([PropTypes.string, PropTypes.func]),
+  symbolSize: PropTypes.number,
+  symbolSpacing: PropTypes.number,
+  symbolBorderWidth: PropTypes.number,
+  symbolBorderColor: PropTypes.string
+};
+var interactivityPropTypes = {
+  onClick: PropTypes.func,
+  onMouseEnter: PropTypes.func,
+  onMouseLeave: PropTypes.func
+};
+var datumPropType = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  color: PropTypes.string.isRequired,
+  fill: PropTypes.string
+});
+var LegendPropShape = _objectSpread({
+  data: PropTypes.arrayOf(datumPropType),
+  anchor: PropTypes.oneOf([ANCHOR_TOP, ANCHOR_TOP_RIGHT, ANCHOR_RIGHT, ANCHOR_BOTTOM_RIGHT, ANCHOR_BOTTOM, ANCHOR_BOTTOM_LEFT, ANCHOR_LEFT, ANCHOR_TOP_LEFT, ANCHOR_CENTER]).isRequired,
+  translateX: PropTypes.number,
+  translateY: PropTypes.number,
+  direction: PropTypes.oneOf([DIRECTION_ROW, DIRECTION_COLUMN]).isRequired,
+  itemsSpacing: PropTypes.number,
+  itemWidth: PropTypes.number.isRequired,
+  itemHeight: PropTypes.number.isRequired,
+  itemDirection: PropTypes.oneOf([DIRECTION_LEFT_TO_RIGHT, DIRECTION_RIGHT_TO_LEFT, DIRECTION_TOP_TO_BOTTOM, DIRECTION_BOTTOM_TO_TOP]),
+  itemTextColor: PropTypes.string,
+  itemBackground: PropTypes.string,
+  itemOpacity: PropTypes.number
+}, symbolPropTypes, interactivityPropTypes, {
+  effects: PropTypes.arrayOf(legendEffectPropType)
+});
+
+function _objectSpread$1(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$1(target, key, source[key]); }); } return target; }
+function _defineProperty$1(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var zeroPadding = {
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0
+};
+var computeDimensions = function computeDimensions(_ref) {
+  var direction = _ref.direction,
+      itemsSpacing = _ref.itemsSpacing,
+      _padding = _ref.padding,
+      itemCount = _ref.itemCount,
+      itemWidth = _ref.itemWidth,
+      itemHeight = _ref.itemHeight;
+  var padding;
+  if (isNumber(_padding)) {
+    padding = {
+      top: _padding,
+      right: _padding,
+      bottom: _padding,
+      left: _padding
+    };
+  } else if (isPlainObject(_padding)) {
+    padding = _objectSpread$1({}, zeroPadding, _padding);
+  } else {
+    throw new TypeError("Invalid property padding, must be one of: number, object");
+  }
+  var horizontalPadding = padding.left + padding.right;
+  var verticalPadding = padding.top + padding.bottom;
+  var width = itemWidth + horizontalPadding;
+  var height = itemHeight + verticalPadding;
+  var spacing = (itemCount - 1) * itemsSpacing;
+  if (direction === DIRECTION_ROW) {
+    width = itemWidth * itemCount + spacing + horizontalPadding;
+  } else if (direction === DIRECTION_COLUMN) {
+    height = itemHeight * itemCount + spacing + verticalPadding;
+  }
+  return {
+    width: width,
+    height: height,
+    padding: padding
+  };
+};
+var computePositionFromAnchor = function computePositionFromAnchor(_ref2) {
+  var anchor = _ref2.anchor,
+      translateX = _ref2.translateX,
+      translateY = _ref2.translateY,
+      containerWidth = _ref2.containerWidth,
+      containerHeight = _ref2.containerHeight,
+      width = _ref2.width,
+      height = _ref2.height;
+  var x = translateX;
+  var y = translateY;
+  switch (anchor) {
+    case ANCHOR_TOP:
+      x += (containerWidth - width) / 2;
+      break;
+    case ANCHOR_TOP_RIGHT:
+      x += containerWidth - width;
+      break;
+    case ANCHOR_RIGHT:
+      x += containerWidth - width;
+      y += (containerHeight - height) / 2;
+      break;
+    case ANCHOR_BOTTOM_RIGHT:
+      x += containerWidth - width;
+      y += containerHeight - height;
+      break;
+    case ANCHOR_BOTTOM:
+      x += (containerWidth - width) / 2;
+      y += containerHeight - height;
+      break;
+    case ANCHOR_BOTTOM_LEFT:
+      y += containerHeight - height;
+      break;
+    case ANCHOR_LEFT:
+      y += (containerHeight - height) / 2;
+      break;
+    case ANCHOR_CENTER:
+      x += (containerWidth - width) / 2;
+      y += (containerHeight - height) / 2;
+      break;
+  }
+  return {
+    x: x,
+    y: y
+  };
+};
+var computeItemLayout = function computeItemLayout(_ref3) {
+  var direction = _ref3.direction,
+      justify = _ref3.justify,
+      symbolSize = _ref3.symbolSize,
+      symbolSpacing = _ref3.symbolSpacing,
+      width = _ref3.width,
+      height = _ref3.height;
+  var symbolX;
+  var symbolY;
+  var labelX;
+  var labelY;
+  var labelAnchor;
+  var labelAlignment;
+  switch (direction) {
+    case DIRECTION_LEFT_TO_RIGHT:
+      symbolX = 0;
+      symbolY = (height - symbolSize) / 2;
+      labelY = height / 2;
+      labelAlignment = 'central';
+      if (justify === true) {
+        labelX = width;
+        labelAnchor = 'end';
+      } else {
+        labelX = symbolSize + symbolSpacing;
+        labelAnchor = 'start';
+      }
+      break;
+    case DIRECTION_RIGHT_TO_LEFT:
+      symbolX = width - symbolSize;
+      symbolY = (height - symbolSize) / 2;
+      labelY = height / 2;
+      labelAlignment = 'central';
+      if (justify === true) {
+        labelX = 0;
+        labelAnchor = 'start';
+      } else {
+        labelX = width - symbolSize - symbolSpacing;
+        labelAnchor = 'end';
+      }
+      break;
+    case DIRECTION_TOP_TO_BOTTOM:
+      symbolX = (width - symbolSize) / 2;
+      symbolY = 0;
+      labelX = width / 2;
+      labelAnchor = 'middle';
+      if (justify === true) {
+        labelY = height;
+        labelAlignment = 'alphabetic';
+      } else {
+        labelY = symbolSize + symbolSpacing;
+        labelAlignment = 'text-before-edge';
+      }
+      break;
+    case DIRECTION_BOTTOM_TO_TOP:
+      symbolX = (width - symbolSize) / 2;
+      symbolY = height - symbolSize;
+      labelX = width / 2;
+      labelAnchor = 'middle';
+      if (justify === true) {
+        labelY = 0;
+        labelAlignment = 'text-before-edge';
+      } else {
+        labelY = height - symbolSize - symbolSpacing;
+        labelAlignment = 'alphabetic';
+      }
+      break;
+  }
+  return {
+    symbolX: symbolX,
+    symbolY: symbolY,
+    labelX: labelX,
+    labelY: labelY,
+    labelAnchor: labelAnchor,
+    labelAlignment: labelAlignment
+  };
+};
+
+var symbolPropTypes$1 = {
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired,
+  size: PropTypes.number.isRequired,
+  fill: PropTypes.string.isRequired,
+  borderWidth: PropTypes.number.isRequired,
+  borderColor: PropTypes.string.isRequired
+};
+var symbolDefaultProps = {
+  borderWidth: 0,
+  borderColor: 'transparent'
+};
+
+function _objectSpread$2(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$2(target, key, source[key]); }); } return target; }
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+function _defineProperty$2(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var SymbolCircle =
+function (_PureComponent) {
+  _inherits(SymbolCircle, _PureComponent);
+  function SymbolCircle() {
+    _classCallCheck(this, SymbolCircle);
+    return _possibleConstructorReturn(this, _getPrototypeOf(SymbolCircle).apply(this, arguments));
+  }
+  _createClass(SymbolCircle, [{
+    key: "render",
+    value: function render() {
+      var _this$props = this.props,
+          x = _this$props.x,
+          y = _this$props.y,
+          size = _this$props.size,
+          fill = _this$props.fill,
+          borderWidth = _this$props.borderWidth,
+          borderColor = _this$props.borderColor;
+      return React.createElement("circle", {
+        r: size / 2,
+        cx: x + size / 2,
+        cy: y + size / 2,
+        fill: fill,
+        strokeWidth: borderWidth,
+        stroke: borderColor,
+        style: {
+          pointerEvents: 'none'
+        }
+      });
+    }
+  }]);
+  return SymbolCircle;
+}(PureComponent);
+_defineProperty$2(SymbolCircle, "propTypes", _objectSpread$2({}, symbolPropTypes$1));
+_defineProperty$2(SymbolCircle, "defaultProps", _objectSpread$2({}, symbolDefaultProps));
+
+function _objectSpread$3(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$3(target, key, source[key]); }); } return target; }
+function _typeof$1(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof$1 = function _typeof(obj) { return typeof obj; }; } else { _typeof$1 = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof$1(obj); }
+function _classCallCheck$1(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties$1(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+function _createClass$1(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties$1(Constructor.prototype, protoProps); if (staticProps) _defineProperties$1(Constructor, staticProps); return Constructor; }
+function _possibleConstructorReturn$1(self, call) { if (call && (_typeof$1(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized$1(self); }
+function _assertThisInitialized$1(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _getPrototypeOf$1(o) { _getPrototypeOf$1 = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf$1(o); }
+function _inherits$1(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf$1(subClass, superClass); }
+function _setPrototypeOf$1(o, p) { _setPrototypeOf$1 = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf$1(o, p); }
+function _defineProperty$3(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var SymbolDiamond =
+function (_PureComponent) {
+  _inherits$1(SymbolDiamond, _PureComponent);
+  function SymbolDiamond() {
+    _classCallCheck$1(this, SymbolDiamond);
+    return _possibleConstructorReturn$1(this, _getPrototypeOf$1(SymbolDiamond).apply(this, arguments));
+  }
+  _createClass$1(SymbolDiamond, [{
+    key: "render",
+    value: function render() {
+      var _this$props = this.props,
+          x = _this$props.x,
+          y = _this$props.y,
+          size = _this$props.size,
+          fill = _this$props.fill,
+          borderWidth = _this$props.borderWidth,
+          borderColor = _this$props.borderColor;
+      return React.createElement("g", {
+        transform: "translate(".concat(x, ",").concat(y, ")")
+      }, React.createElement("path", {
+        d: "\n                    M".concat(size / 2, " 0\n                    L").concat(size * 0.8, " ").concat(size / 2, "\n                    L").concat(size / 2, " ").concat(size, "\n                    L").concat(size * 0.2, " ").concat(size / 2, "\n                    L").concat(size / 2, " 0\n                "),
+        fill: fill,
+        strokeWidth: borderWidth,
+        stroke: borderColor,
+        style: {
+          pointerEvents: 'none'
+        }
+      }));
+    }
+  }]);
+  return SymbolDiamond;
+}(PureComponent);
+_defineProperty$3(SymbolDiamond, "propTypes", _objectSpread$3({}, symbolPropTypes$1));
+_defineProperty$3(SymbolDiamond, "defaultProps", _objectSpread$3({}, symbolDefaultProps));
+
+function _objectSpread$4(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$4(target, key, source[key]); }); } return target; }
+function _typeof$2(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof$2 = function _typeof(obj) { return typeof obj; }; } else { _typeof$2 = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof$2(obj); }
+function _classCallCheck$2(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties$2(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+function _createClass$2(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties$2(Constructor.prototype, protoProps); if (staticProps) _defineProperties$2(Constructor, staticProps); return Constructor; }
+function _possibleConstructorReturn$2(self, call) { if (call && (_typeof$2(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized$2(self); }
+function _assertThisInitialized$2(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _getPrototypeOf$2(o) { _getPrototypeOf$2 = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf$2(o); }
+function _inherits$2(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf$2(subClass, superClass); }
+function _setPrototypeOf$2(o, p) { _setPrototypeOf$2 = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf$2(o, p); }
+function _defineProperty$4(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var SymbolSquare =
+function (_PureComponent) {
+  _inherits$2(SymbolSquare, _PureComponent);
+  function SymbolSquare() {
+    _classCallCheck$2(this, SymbolSquare);
+    return _possibleConstructorReturn$2(this, _getPrototypeOf$2(SymbolSquare).apply(this, arguments));
+  }
+  _createClass$2(SymbolSquare, [{
+    key: "render",
+    value: function render() {
+      var _this$props = this.props,
+          x = _this$props.x,
+          y = _this$props.y,
+          size = _this$props.size,
+          fill = _this$props.fill,
+          borderWidth = _this$props.borderWidth,
+          borderColor = _this$props.borderColor;
+      return React.createElement("rect", {
+        x: x,
+        y: y,
+        fill: fill,
+        strokeWidth: borderWidth,
+        stroke: borderColor,
+        width: size,
+        height: size,
+        style: {
+          pointerEvents: 'none'
+        }
+      });
+    }
+  }]);
+  return SymbolSquare;
+}(PureComponent);
+_defineProperty$4(SymbolSquare, "propTypes", _objectSpread$4({}, symbolPropTypes$1));
+_defineProperty$4(SymbolSquare, "defaultProps", _objectSpread$4({}, symbolDefaultProps));
+
+function _objectSpread$5(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$5(target, key, source[key]); }); } return target; }
+function _typeof$3(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof$3 = function _typeof(obj) { return typeof obj; }; } else { _typeof$3 = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof$3(obj); }
+function _classCallCheck$3(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties$3(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+function _createClass$3(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties$3(Constructor.prototype, protoProps); if (staticProps) _defineProperties$3(Constructor, staticProps); return Constructor; }
+function _possibleConstructorReturn$3(self, call) { if (call && (_typeof$3(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized$3(self); }
+function _assertThisInitialized$3(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _getPrototypeOf$3(o) { _getPrototypeOf$3 = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf$3(o); }
+function _inherits$3(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf$3(subClass, superClass); }
+function _setPrototypeOf$3(o, p) { _setPrototypeOf$3 = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf$3(o, p); }
+function _defineProperty$5(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var SymbolTriangle =
+function (_PureComponent) {
+  _inherits$3(SymbolTriangle, _PureComponent);
+  function SymbolTriangle() {
+    _classCallCheck$3(this, SymbolTriangle);
+    return _possibleConstructorReturn$3(this, _getPrototypeOf$3(SymbolTriangle).apply(this, arguments));
+  }
+  _createClass$3(SymbolTriangle, [{
+    key: "render",
+    value: function render() {
+      var _this$props = this.props,
+          x = _this$props.x,
+          y = _this$props.y,
+          size = _this$props.size,
+          fill = _this$props.fill,
+          borderWidth = _this$props.borderWidth,
+          borderColor = _this$props.borderColor;
+      return React.createElement("g", {
+        transform: "translate(".concat(x, ",").concat(y, ")")
+      }, React.createElement("path", {
+        d: "\n                M".concat(size / 2, " 0\n                L").concat(size, " ").concat(size, "\n                L0 ").concat(size, "\n                L").concat(size / 2, " 0\n            "),
+        fill: fill,
+        strokeWidth: borderWidth,
+        stroke: borderColor,
+        style: {
+          pointerEvents: 'none'
+        }
+      }));
+    }
+  }]);
+  return SymbolTriangle;
+}(PureComponent);
+_defineProperty$5(SymbolTriangle, "propTypes", _objectSpread$5({}, symbolPropTypes$1));
+_defineProperty$5(SymbolTriangle, "defaultProps", _objectSpread$5({}, symbolDefaultProps));
+
+function _objectSpread$6(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$6(target, key, source[key]); }); } return target; }
+function _defineProperty$6(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
+function _iterableToArrayLimit(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
+function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+var symbolByShape = {
+  circle: SymbolCircle,
+  diamond: SymbolDiamond,
+  square: SymbolSquare,
+  triangle: SymbolTriangle
+};
+var LegendSvgItem = function LegendSvgItem(_ref) {
+  var x = _ref.x,
+      y = _ref.y,
+      width = _ref.width,
+      height = _ref.height,
+      data = _ref.data,
+      direction = _ref.direction,
+      justify = _ref.justify,
+      textColor = _ref.textColor,
+      background = _ref.background,
+      opacity = _ref.opacity,
+      symbolShape = _ref.symbolShape,
+      symbolSize = _ref.symbolSize,
+      symbolSpacing = _ref.symbolSpacing,
+      symbolBorderWidth = _ref.symbolBorderWidth,
+      symbolBorderColor = _ref.symbolBorderColor,
+      onClick = _ref.onClick,
+      onMouseEnter = _ref.onMouseEnter,
+      onMouseLeave = _ref.onMouseLeave,
+      effects = _ref.effects;
+  var _useState = useState({}),
+      _useState2 = _slicedToArray(_useState, 2),
+      style = _useState2[0],
+      setStyle = _useState2[1];
+  var theme = useTheme();
+  var handleClick = useCallback(function (event) {
+    return onClick && onClick(data, event);
+  }, [onClick, data]);
+  var handleMouseEnter = useCallback(function (event) {
+    if (effects.length > 0) {
+      var applyEffects = effects.filter(function (_ref2) {
+        var on = _ref2.on;
+        return on === 'hover';
+      });
+      var _style = applyEffects.reduce(function (acc, effect) {
+        return _objectSpread$6({}, acc, effect.style);
+      }, {});
+      setStyle(_style);
+    }
+    if (onMouseEnter === undefined) return;
+    onMouseEnter(data, event);
+  }, [onMouseEnter, data, effects]);
+  var handleMouseLeave = useCallback(function () {
+    if (effects.length > 0) {
+      var applyEffects = effects.filter(function (_ref3) {
+        var on = _ref3.on;
+        return on !== 'hover';
+      });
+      var _style2 = applyEffects.reduce(function (acc, effect) {
+        return _objectSpread$6({}, acc, effect.style);
+      }, {});
+      setStyle(_style2);
+    }
+    if (onMouseLeave === undefined) return;
+    onMouseLeave(data, event);
+  }, [onMouseLeave, data, effects]);
+  var _computeItemLayout = computeItemLayout({
+    direction: direction,
+    justify: justify,
+    symbolSize: style.symbolSize || symbolSize,
+    symbolSpacing: symbolSpacing,
+    width: width,
+    height: height
+  }),
+      symbolX = _computeItemLayout.symbolX,
+      symbolY = _computeItemLayout.symbolY,
+      labelX = _computeItemLayout.labelX,
+      labelY = _computeItemLayout.labelY,
+      labelAnchor = _computeItemLayout.labelAnchor,
+      labelAlignment = _computeItemLayout.labelAlignment;
+  var isInteractive = [onClick, onMouseEnter, onMouseLeave].some(function (handler) {
+    return handler !== undefined;
+  });
+  var _Symbol;
+  if (isFunction(symbolShape)) {
+    _Symbol = symbolShape;
+  } else {
+    _Symbol = symbolByShape[symbolShape];
+  }
+  return React.createElement("g", {
+    transform: "translate(".concat(x, ",").concat(y, ")"),
+    style: {
+      opacity: style.itemOpacity !== undefined ? style.itemOpacity : opacity
+    }
+  }, React.createElement("rect", {
+    width: width,
+    height: height,
+    fill: style.itemBackground || background,
+    style: {
+      cursor: isInteractive ? 'pointer' : 'auto'
+    },
+    onClick: handleClick,
+    onMouseEnter: handleMouseEnter,
+    onMouseLeave: handleMouseLeave
+  }), React.createElement(_Symbol, {
+    x: symbolX,
+    y: symbolY,
+    size: style.symbolSize || symbolSize,
+    fill: data.fill || data.color,
+    borderWidth: style.symbolBorderWidth !== undefined ? style.symbolBorderWidth : symbolBorderWidth,
+    borderColor: style.symbolBorderColor || symbolBorderColor
+  }), React.createElement("text", {
+    textAnchor: labelAnchor,
+    style: _objectSpread$6({}, theme.legends.text, {
+      fill: style.itemTextColor || textColor,
+      dominantBaseline: labelAlignment,
+      pointerEvents: 'none',
+      userSelect: 'none'
+    }),
+    x: labelX,
+    y: labelY
+  }, data.label));
+};
+LegendSvgItem.displayName = 'LegendSvgItem';
+LegendSvgItem.propTypes = _objectSpread$6({
+  data: datumPropType.isRequired,
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired,
+  width: PropTypes.number.isRequired,
+  height: PropTypes.number.isRequired,
+  textColor: PropTypes.string,
+  background: PropTypes.string,
+  opacity: PropTypes.number,
+  direction: PropTypes.oneOf(['left-to-right', 'right-to-left', 'top-to-bottom', 'bottom-to-top']).isRequired,
+  justify: PropTypes.bool.isRequired
+}, symbolPropTypes, interactivityPropTypes);
+LegendSvgItem.defaultProps = {
+  direction: 'left-to-right',
+  justify: false,
+  textColor: 'black',
+  background: 'transparent',
+  opacity: 1,
+  symbolShape: 'square',
+  symbolSize: 16,
+  symbolSpacing: 8,
+  symbolBorderWidth: 0,
+  symbolBorderColor: 'transparent',
+  effects: []
+};
+
+function _objectSpread$7(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$7(target, key, source[key]); }); } return target; }
+function _defineProperty$7(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var LegendSvg = function LegendSvg(_ref) {
+  var data = _ref.data,
+      x = _ref.x,
+      y = _ref.y,
+      containerHeight = _ref.containerHeight,
+      scrollableLegend = _ref.scrollableLegend,
+      direction = _ref.direction,
+      _padding = _ref.padding,
+      justify = _ref.justify,
+      effects = _ref.effects,
+      itemWidth = _ref.itemWidth,
+      itemHeight = _ref.itemHeight,
+      itemDirection = _ref.itemDirection,
+      itemsSpacing = _ref.itemsSpacing,
+      itemTextColor = _ref.itemTextColor,
+      itemBackground = _ref.itemBackground,
+      itemOpacity = _ref.itemOpacity,
+      symbolShape = _ref.symbolShape,
+      symbolSize = _ref.symbolSize,
+      symbolSpacing = _ref.symbolSpacing,
+      symbolBorderWidth = _ref.symbolBorderWidth,
+      symbolBorderColor = _ref.symbolBorderColor,
+      onClick = _ref.onClick,
+      onMouseEnter = _ref.onMouseEnter,
+      onMouseLeave = _ref.onMouseLeave;
+  var _computeDimensions = computeDimensions({
+    itemCount: data.length,
+    itemWidth: itemWidth,
+    itemHeight: itemHeight,
+    itemsSpacing: itemsSpacing,
+    direction: direction,
+    padding: _padding
+  }),
+      padding = _computeDimensions.padding;
+  var xStep = 0;
+  var yStep = 0;
+  if (direction === 'row') {
+    xStep = itemWidth + itemsSpacing;
+  } else if (direction === 'column') {
+    yStep = itemHeight + itemsSpacing;
+  }
+  return React.createElement("g", {
+    transform: "translate(".concat(x, ",").concat(y, ")")
+  }, scrollableLegend ? React.createElement("foreignObject", {
+    width: 180,
+    height: containerHeight
+  }, React.createElement("div", {
+    style: {
+      height: '100%',
+      overflow: 'auto'
+    },
+    xmlns: "http://www.w3.org/1999/xhtml"
+  }, React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    role: "img",
+    width: '100%',
+    height: "".concat(data.length * itemHeight, "px")
+  }, data.map(function (data, i) {
+    return React.createElement(LegendSvgItem, {
+      key: i,
+      data: data,
+      x: i * xStep + padding.left,
+      y: i * yStep + padding.top,
+      width: itemWidth,
+      height: itemHeight,
+      direction: itemDirection,
+      justify: justify,
+      effects: effects,
+      textColor: itemTextColor,
+      background: itemBackground,
+      opacity: itemOpacity,
+      symbolShape: symbolShape,
+      symbolSize: symbolSize,
+      symbolSpacing: symbolSpacing,
+      symbolBorderWidth: symbolBorderWidth,
+      symbolBorderColor: symbolBorderColor,
+      onClick: onClick,
+      onMouseEnter: onMouseEnter,
+      onMouseLeave: onMouseLeave
+    });
+  })))) : React.createElement(React.Fragment, null, data.map(function (data, i) {
+    return React.createElement(LegendSvgItem, {
+      key: i,
+      data: data,
+      x: i * xStep + padding.left,
+      y: i * yStep + padding.top,
+      width: itemWidth,
+      height: itemHeight,
+      direction: itemDirection,
+      justify: justify,
+      effects: effects,
+      textColor: itemTextColor,
+      background: itemBackground,
+      opacity: itemOpacity,
+      symbolShape: symbolShape,
+      symbolSize: symbolSize,
+      symbolSpacing: symbolSpacing,
+      symbolBorderWidth: symbolBorderWidth,
+      symbolBorderColor: symbolBorderColor,
+      onClick: onClick,
+      onMouseEnter: onMouseEnter,
+      onMouseLeave: onMouseLeave
+    });
+  })));
+};
+LegendSvg.propTypes = _objectSpread$7({
+  data: PropTypes.arrayOf(datumPropType).isRequired,
+  x: PropTypes.number.isRequired,
+  y: PropTypes.number.isRequired,
+  containerHeight: PropTypes.number,
+  scrollableLegend: PropTypes.bool,
+  direction: PropTypes.oneOf(['row', 'column']).isRequired,
+  padding: PropTypes.oneOfType([PropTypes.number, PropTypes.shape({
+    top: PropTypes.number,
+    right: PropTypes.number,
+    bottom: PropTypes.number,
+    left: PropTypes.number
+  })]).isRequired,
+  justify: PropTypes.bool.isRequired,
+  itemsSpacing: PropTypes.number.isRequired,
+  itemWidth: PropTypes.number.isRequired,
+  itemHeight: PropTypes.number.isRequired,
+  itemDirection: PropTypes.oneOf([DIRECTION_LEFT_TO_RIGHT, DIRECTION_RIGHT_TO_LEFT, DIRECTION_TOP_TO_BOTTOM, DIRECTION_BOTTOM_TO_TOP]).isRequired,
+  itemTextColor: PropTypes.string.isRequired,
+  itemBackground: PropTypes.string.isRequired,
+  itemOpacity: PropTypes.number.isRequired
+}, symbolPropTypes, interactivityPropTypes);
+LegendSvg.defaultProps = {
+  padding: 0,
+  justify: false,
+  itemsSpacing: 0,
+  itemDirection: 'left-to-right',
+  itemTextColor: 'black',
+  itemBackground: 'transparent',
+  itemOpacity: 1
+};
+
+function _objectSpread$8(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$8(target, key, source[key]); }); } return target; }
+function _defineProperty$8(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var BoxLegendSvg = function BoxLegendSvg(_ref) {
+  var data = _ref.data,
+      containerWidth = _ref.containerWidth,
+      containerHeight = _ref.containerHeight,
+      scrollableLegend = _ref.scrollableLegend,
+      translateX = _ref.translateX,
+      translateY = _ref.translateY,
+      anchor = _ref.anchor,
+      direction = _ref.direction,
+      padding = _ref.padding,
+      justify = _ref.justify,
+      itemsSpacing = _ref.itemsSpacing,
+      itemWidth = _ref.itemWidth,
+      itemHeight = _ref.itemHeight,
+      itemDirection = _ref.itemDirection,
+      itemTextColor = _ref.itemTextColor,
+      itemBackground = _ref.itemBackground,
+      itemOpacity = _ref.itemOpacity,
+      symbolShape = _ref.symbolShape,
+      symbolSize = _ref.symbolSize,
+      symbolSpacing = _ref.symbolSpacing,
+      symbolBorderWidth = _ref.symbolBorderWidth,
+      symbolBorderColor = _ref.symbolBorderColor,
+      onClick = _ref.onClick,
+      onMouseEnter = _ref.onMouseEnter,
+      onMouseLeave = _ref.onMouseLeave,
+      effects = _ref.effects;
+  var _computeDimensions = computeDimensions({
+    itemCount: data.length,
+    itemsSpacing: itemsSpacing,
+    itemWidth: itemWidth,
+    itemHeight: itemHeight,
+    direction: direction,
+    padding: padding
+  }),
+      width = _computeDimensions.width,
+      height = _computeDimensions.height;
+  var _computePositionFromA = computePositionFromAnchor({
+    anchor: anchor,
+    translateX: translateX,
+    translateY: translateY,
+    containerWidth: containerWidth,
+    containerHeight: containerHeight,
+    width: width,
+    height: height
+  }),
+      x = _computePositionFromA.x,
+      y = _computePositionFromA.y;
+  return React.createElement(LegendSvg, {
+    data: data,
+    x: x,
+    y: y,
+    containerHeight: containerHeight,
+    scrollableLegend: scrollableLegend,
+    direction: direction,
+    padding: padding,
+    justify: justify,
+    effects: effects,
+    itemsSpacing: itemsSpacing,
+    itemWidth: itemWidth,
+    itemHeight: itemHeight,
+    itemDirection: itemDirection,
+    itemTextColor: itemTextColor,
+    itemBackground: itemBackground,
+    itemOpacity: itemOpacity,
+    symbolShape: symbolShape,
+    symbolSize: symbolSize,
+    symbolSpacing: symbolSpacing,
+    symbolBorderWidth: symbolBorderWidth,
+    symbolBorderColor: symbolBorderColor,
+    onClick: onClick,
+    onMouseEnter: onMouseEnter,
+    onMouseLeave: onMouseLeave
+  });
+};
+BoxLegendSvg.propTypes = _objectSpread$8({
+  data: PropTypes.arrayOf(datumPropType).isRequired,
+  containerWidth: PropTypes.number.isRequired,
+  containerHeight: PropTypes.number.isRequired,
+  scrollableLegend: PropTypes.bool,
+  translateX: PropTypes.number.isRequired,
+  translateY: PropTypes.number.isRequired,
+  anchor: PropTypes.oneOf([ANCHOR_TOP, ANCHOR_TOP_RIGHT, ANCHOR_RIGHT, ANCHOR_BOTTOM_RIGHT, ANCHOR_BOTTOM, ANCHOR_BOTTOM_LEFT, ANCHOR_LEFT, ANCHOR_TOP_LEFT, ANCHOR_CENTER]).isRequired,
+  direction: PropTypes.oneOf([DIRECTION_ROW, DIRECTION_COLUMN]).isRequired,
+  padding: PropTypes.oneOfType([PropTypes.number, PropTypes.shape({
+    top: PropTypes.number,
+    right: PropTypes.number,
+    bottom: PropTypes.number,
+    left: PropTypes.number
+  })]).isRequired,
+  justify: PropTypes.bool,
+  itemWidth: PropTypes.number.isRequired,
+  itemHeight: PropTypes.number.isRequired,
+  itemDirection: PropTypes.oneOf([DIRECTION_LEFT_TO_RIGHT, DIRECTION_RIGHT_TO_LEFT, DIRECTION_TOP_TO_BOTTOM, DIRECTION_BOTTOM_TO_TOP]),
+  itemsSpacing: PropTypes.number.isRequired,
+  itemTextColor: PropTypes.string,
+  itemBackground: PropTypes.string,
+  itemOpacity: PropTypes.number
+}, symbolPropTypes, interactivityPropTypes);
+BoxLegendSvg.defaultProps = {
+  translateX: 0,
+  translateY: 0,
+  itemsSpacing: LegendSvg.defaultProps.itemsSpacing,
+  padding: LegendSvg.defaultProps.padding
+};
 
 var getIndexedScale = function getIndexedScale(data, getIndex, range, padding) {
   return scaleBand().rangeRound(range).domain(data.map(getIndex)).padding(padding);
@@ -385,9 +1215,8 @@ var getLegendData = function getLegendData(_ref3) {
   return getLegendDataForKeys(bars, layout, groupMode, reverse);
 };
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(source, true).forEach(function (key) { _defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _objectSpread$9(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$9(target, key, source[key]); }); } return target; }
+function _defineProperty$9(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 var BarItem = function BarItem(_ref) {
   var data = _ref.data,
       x = _ref.x,
@@ -438,7 +1267,7 @@ var BarItem = function BarItem(_ref) {
     y: height / 2,
     textAnchor: "middle",
     dominantBaseline: "central",
-    style: _objectSpread({}, theme.labels.text, {
+    style: _objectSpread$9({}, theme.labels.text, {
       pointerEvents: 'none',
       fill: labelColor
     })
@@ -479,7 +1308,7 @@ var enhance = compose(withPropsOnChange(['data', 'color', 'onClick'], function (
       _onClick = _ref2.onClick;
   return {
     onClick: function onClick(event) {
-      return _onClick(_objectSpread({
+      return _onClick(_objectSpread$9({
         color: color
       }, data), event);
     }
@@ -499,7 +1328,7 @@ var enhance = compose(withPropsOnChange(['data', 'color', 'onClick'], function (
       color: color,
       theme: theme,
       format: tooltipFormat,
-      renderContent: typeof tooltip === 'function' ? tooltip.bind(null, _objectSpread({
+      renderContent: typeof tooltip === 'function' ? tooltip.bind(null, _objectSpread$9({
         color: color,
         theme: theme
       }, data)) : null
@@ -508,10 +1337,9 @@ var enhance = compose(withPropsOnChange(['data', 'color', 'onClick'], function (
 }), pure);
 var BarItem$1 = enhance(BarItem);
 
-function ownKeys$1(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread$1(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$1(source, true).forEach(function (key) { _defineProperty$1(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$1(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-function _defineProperty$1(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-var BarPropTypes = _objectSpread$1({
+function _objectSpread$a(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$a(target, key, source[key]); }); } return target; }
+function _defineProperty$a(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var BarPropTypes = _objectSpread$a({
   data: PropTypes.arrayOf(PropTypes.object).isRequired,
   indexBy: PropTypes.oneOfType([PropTypes.string, PropTypes.func]).isRequired,
   getIndex: PropTypes.func.isRequired,
@@ -559,9 +1387,10 @@ var BarPropTypes = _objectSpread$1({
   getTooltipLabel: PropTypes.func.isRequired,
   tooltipFormat: PropTypes.oneOfType([PropTypes.func, PropTypes.string]),
   tooltip: PropTypes.func,
-  legends: PropTypes.arrayOf(PropTypes.shape(_objectSpread$1({
+  legends: PropTypes.arrayOf(PropTypes.shape(_objectSpread$a({
     dataFrom: PropTypes.oneOf(['indexes', 'keys']).isRequired
-  }, LegendPropShape))).isRequired,
+  }, LegendPropShape$1))).isRequired,
+  scrollableLegend: PropTypes.bool,
   pixelRatio: PropTypes.number.isRequired
 });
 var BarDefaultProps = {
@@ -602,6 +1431,7 @@ var BarDefaultProps = {
   onMouseEnter: noop,
   onMouseLeave: noop,
   legends: [],
+  scrollableLegend: false,
   annotations: [],
   pixelRatio: global.window && global.window.devicePixelRatio ? global.window.devicePixelRatio : 1
 };
@@ -683,23 +1513,24 @@ var BarAnnotations = function BarAnnotations(_ref) {
     }
   });
   return boundAnnotations.map(function (annotation, i) {
-    return React.createElement(Annotation, _extends({
-      key: i
-    }, annotation, {
-      containerWidth: innerWidth,
-      containerHeight: innerHeight,
-      animate: animate,
-      motionStiffness: motionStiffness,
-      motionDamping: motionDamping
-    }));
+    return (
+      React.createElement(Annotation, _extends({
+        key: i
+      }, annotation, {
+        containerWidth: innerWidth,
+        containerHeight: innerHeight,
+        animate: animate,
+        motionStiffness: motionStiffness,
+        motionDamping: motionDamping
+      }))
+    );
   });
 };
 BarAnnotations.propTypes = {};
 
 function _extends$1() { _extends$1 = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends$1.apply(this, arguments); }
-function ownKeys$2(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread$2(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$2(source, true).forEach(function (key) { _defineProperty$2(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$2(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-function _defineProperty$2(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _objectSpread$b(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$b(target, key, source[key]); }); } return target; }
+function _defineProperty$b(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 var barWillEnterHorizontal = function barWillEnterHorizontal(_ref) {
   var style = _ref.style;
   return {
@@ -788,6 +1619,7 @@ var Bar = function Bar(props) {
       onMouseEnter = props.onMouseEnter,
       onMouseLeave = props.onMouseLeave,
       legends = props.legends,
+      scrollableLegend = props.scrollableLegend,
       animate = props.animate,
       motionStiffness = props.motionStiffness,
       motionDamping = props.motionDamping;
@@ -877,10 +1709,10 @@ var Bar = function Bar(props) {
           var key = _ref7.key,
               style = _ref7.style,
               bar = _ref7.data;
-          var baseProps = _objectSpread$2({}, bar, {}, style);
-          return React.createElement(barComponent, _objectSpread$2({
+          var baseProps = _objectSpread$b({}, bar, style);
+          return React.createElement(barComponent, _objectSpread$b({
             key: key
-          }, baseProps, {}, commonProps, {
+          }, baseProps, commonProps, {
             shouldRenderLabel: shouldRenderLabel(baseProps),
             width: Math.max(style.width, 0),
             height: Math.max(style.height, 0),
@@ -893,9 +1725,9 @@ var Bar = function Bar(props) {
       });
     } else {
       bars = result.bars.map(function (d) {
-        return React.createElement(barComponent, _objectSpread$2({
+        return React.createElement(barComponent, _objectSpread$b({
           key: d.key
-        }, d, {}, commonProps, {
+        }, d, commonProps, {
           label: getLabel(d.data),
           shouldRenderLabel: shouldRenderLabel(d),
           labelColor: getLabelTextColor(d, theme),
@@ -949,6 +1781,7 @@ var Bar = function Bar(props) {
         }, legend, {
           containerWidth: width,
           containerHeight: height,
+          scrollableLegend: scrollableLegend,
           data: legendData,
           theme: theme
         }));
@@ -971,7 +1804,7 @@ var Bar = function Bar(props) {
       if (typeof layer === 'function') {
         return React.createElement(Fragment, {
           key: i
-        }, layer(_objectSpread$2({}, props, {}, result)));
+        }, layer(_objectSpread$b({}, props, result)));
       }
       return layerById[layer];
     }));
@@ -980,22 +1813,21 @@ var Bar = function Bar(props) {
 Bar.propTypes = BarPropTypes;
 var Bar$1 = setDisplayName('Bar')(enhance$1(Bar));
 
-function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-function ownKeys$3(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread$3(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$3(source, true).forEach(function (key) { _defineProperty$3(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$3(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest(); }
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
-function _iterableToArrayLimit(arr, i) { if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) { return; } var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
-function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
-function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
-function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-function _defineProperty$3(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _typeof$4(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof$4 = function _typeof(obj) { return typeof obj; }; } else { _typeof$4 = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof$4(obj); }
+function _objectSpread$c(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$c(target, key, source[key]); }); } return target; }
+function _slicedToArray$1(arr, i) { return _arrayWithHoles$1(arr) || _iterableToArrayLimit$1(arr, i) || _nonIterableRest$1(); }
+function _nonIterableRest$1() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
+function _iterableToArrayLimit$1(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
+function _arrayWithHoles$1(arr) { if (Array.isArray(arr)) return arr; }
+function _classCallCheck$4(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties$4(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+function _createClass$4(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties$4(Constructor.prototype, protoProps); if (staticProps) _defineProperties$4(Constructor, staticProps); return Constructor; }
+function _possibleConstructorReturn$4(self, call) { if (call && (_typeof$4(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized$4(self); }
+function _getPrototypeOf$4(o) { _getPrototypeOf$4 = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf$4(o); }
+function _assertThisInitialized$4(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _inherits$4(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf$4(subClass, superClass); }
+function _setPrototypeOf$4(o, p) { _setPrototypeOf$4 = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf$4(o, p); }
+function _defineProperty$c(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 var findNodeUnderCursor = function findNodeUnderCursor(nodes, margin, x, y) {
   return nodes.find(function (node) {
     return isCursorInRect(node.x + margin.left, node.y + margin.top, node.width, node.height, x, y);
@@ -1003,16 +1835,16 @@ var findNodeUnderCursor = function findNodeUnderCursor(nodes, margin, x, y) {
 };
 var BarCanvas =
 function (_Component) {
-  _inherits(BarCanvas, _Component);
+  _inherits$4(BarCanvas, _Component);
   function BarCanvas() {
     var _getPrototypeOf2;
     var _this;
-    _classCallCheck(this, BarCanvas);
+    _classCallCheck$4(this, BarCanvas);
     for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
       args[_key] = arguments[_key];
     }
-    _this = _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(BarCanvas)).call.apply(_getPrototypeOf2, [this].concat(args)));
-    _defineProperty$3(_assertThisInitialized(_this), "handleMouseHover", function (showTooltip, hideTooltip) {
+    _this = _possibleConstructorReturn$4(this, (_getPrototypeOf2 = _getPrototypeOf$4(BarCanvas)).call.apply(_getPrototypeOf2, [this].concat(args)));
+    _defineProperty$c(_assertThisInitialized$4(_this), "handleMouseHover", function (showTooltip, hideTooltip) {
       return function (event) {
         if (!_this.bars) return;
         var _this$props = _this.props,
@@ -1022,7 +1854,7 @@ function (_Component) {
             getTooltipLabel = _this$props.getTooltipLabel,
             tooltipFormat = _this$props.tooltipFormat;
         var _getRelativeCursor = getRelativeCursor(_this.surface, event),
-            _getRelativeCursor2 = _slicedToArray(_getRelativeCursor, 2),
+            _getRelativeCursor2 = _slicedToArray$1(_getRelativeCursor, 2),
             x = _getRelativeCursor2[0],
             y = _getRelativeCursor2[1];
         var bar = findNodeUnderCursor(_this.bars, margin, x, y);
@@ -1034,7 +1866,7 @@ function (_Component) {
             color: bar.color,
             theme: theme,
             format: tooltipFormat,
-            renderContent: typeof tooltip === 'function' ? tooltip.bind(null, _objectSpread$3({
+            renderContent: typeof tooltip === 'function' ? tooltip.bind(null, _objectSpread$c({
               color: bar.color
             }, bar.data)) : null
           }), event);
@@ -1043,18 +1875,18 @@ function (_Component) {
         }
       };
     });
-    _defineProperty$3(_assertThisInitialized(_this), "handleMouseLeave", function (hideTooltip) {
+    _defineProperty$c(_assertThisInitialized$4(_this), "handleMouseLeave", function (hideTooltip) {
       return function () {
         hideTooltip();
       };
     });
-    _defineProperty$3(_assertThisInitialized(_this), "handleClick", function (event) {
+    _defineProperty$c(_assertThisInitialized$4(_this), "handleClick", function (event) {
       if (!_this.bars) return;
       var _this$props2 = _this.props,
           margin = _this$props2.margin,
           onClick = _this$props2.onClick;
       var _getRelativeCursor3 = getRelativeCursor(_this.surface, event),
-          _getRelativeCursor4 = _slicedToArray(_getRelativeCursor3, 2),
+          _getRelativeCursor4 = _slicedToArray$1(_getRelativeCursor3, 2),
           x = _getRelativeCursor4[0],
           y = _getRelativeCursor4[1];
       var node = findNodeUnderCursor(_this.bars, margin, x, y);
@@ -1062,7 +1894,7 @@ function (_Component) {
     });
     return _this;
   }
-  _createClass(BarCanvas, [{
+  _createClass$4(BarCanvas, [{
     key: "componentDidMount",
     value: function componentDidMount() {
       this.ctx = this.surface.getContext('2d');
@@ -1188,7 +2020,7 @@ function (_Component) {
           legendData = legendDataForIndexes;
         }
         if (legendData === undefined) return null;
-        renderLegendToCanvas(_this2.ctx, _objectSpread$3({}, legend, {
+        renderLegendToCanvas(_this2.ctx, _objectSpread$c({}, legend, {
           data: legendData,
           containerWidth: width,
           containerHeight: height,

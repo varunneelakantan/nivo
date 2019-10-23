@@ -42,15 +42,15 @@ var generateBulletData = function generateBulletData(id, max) {
       measureCount = _ref$measureCount === void 0 ? 1 : _ref$measureCount,
       _ref$markerCount = _ref.markerCount,
       markerCount = _ref$markerCount === void 0 ? 1 : _ref$markerCount,
-      _ref$float = _ref["float"],
-      _float = _ref$float === void 0 ? false : _ref$float;
+      _ref$float = _ref.float,
+      float = _ref$float === void 0 ? false : _ref$float;
   var ranges = range(rangeCount - 1).reduce(function (acc) {
     var remaining = max - acc[0];
-    return [random(remaining, _float)].concat(_toConsumableArray(acc));
+    return [random(remaining, float)].concat(_toConsumableArray(acc));
   }, [max]);
   var measures = range(measureCount).reduce(function (acc) {
-    if (acc.length === 0) return [random(max, _float)];
-    return [random(acc[0], _float)].concat(_toConsumableArray(acc));
+    if (acc.length === 0) return [random(max, float)];
+    return [random(acc[0], float)].concat(_toConsumableArray(acc));
   }, []);
   var markers = range(markerCount).map(function () {
     return max * 0.6 + random(max * 0.4);
@@ -89,8 +89,7 @@ var generateChordData = function generateChordData() {
   };
 };
 
-function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys(source, true).forEach(function (key) { _defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty(target, key, source[key]); }); } return target; }
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _toConsumableArray$1(arr) { return _arrayWithoutHoles$1(arr) || _iterableToArray$1(arr) || _nonIterableSpread$1(); }
 function _nonIterableSpread$1() { throw new TypeError("Invalid attempt to spread non-iterable instance"); }
@@ -201,8 +200,7 @@ var generateSankeyData = function generateSankeyData() {
   };
 };
 
-function ownKeys$1(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-function _objectSpread$1(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$1(source, true).forEach(function (key) { _defineProperty$1(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$1(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread$1(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty$1(target, key, source[key]); }); } return target; }
 function _defineProperty$1(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _toConsumableArray$3(arr) { return _arrayWithoutHoles$3(arr) || _iterableToArray$3(arr) || _nonIterableSpread$3(); }
 function _nonIterableSpread$3() { throw new TypeError("Invalid attempt to spread non-iterable instance"); }
